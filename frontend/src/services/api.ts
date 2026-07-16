@@ -1,5 +1,6 @@
 import axios from "axios";
 import { CreateOfficeDTO, Office, UpdateOfficeDTO } from "../types/office";
+import { tokenStorage } from "./tokenStorage";
 
 // Ponto único de configuração da API.
 // Ao criar novos módulos (chat, avaliações, pagamentos), crie novos
@@ -12,8 +13,19 @@ export const api = axios.create({
   },
 });
 
+// Anexa o token salvo (se existir) em toda requisição — necessário para
+// as rotas protegidas do módulo admin.
+api.interceptors.request.use((config) => {
+  const token = tokenStorage.getToken();
+  if (token) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export const officeService = {
-  async list(params?: { ownerId?: string; status?: string }): Promise<Office[]> {
+  async list(params?: { ownerId?: string; status?: string; moderationStatus?: string }): Promise<Office[]> {
     const { data } = await api.get<Office[]>("/offices", { params });
     return data;
   },

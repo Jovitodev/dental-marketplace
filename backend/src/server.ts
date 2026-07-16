@@ -2,6 +2,7 @@ import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import { officeRoutes } from "./modules/offices/office.routes";
 import { userRoutes } from "./modules/users/user.routes";
+import { adminRoutes } from "./modules/admin/admin.routes";
 
 const app = express();
 const PORT = process.env.PORT || 3333;
@@ -18,6 +19,7 @@ app.get("/health", (_req, res) => {
 // Ex futuro: app.use("/api", chatRoutes); app.use("/api", reviewRoutes);
 app.use("/api", officeRoutes);
 app.use("/api", userRoutes);
+app.use("/api", adminRoutes);
 
 // 404 padrão
 app.use((_req: Request, res: Response) => {

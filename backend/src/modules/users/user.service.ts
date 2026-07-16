@@ -50,6 +50,8 @@ export const userService = {
       yearsHosting: 0,
       responseRate: 100,
       responseTime: "Novo por aqui",
+      role: "user",
+      status: "ATIVO",
       createdAt: now,
     };
 
@@ -63,7 +65,22 @@ export const userService = {
     if (!user || user.passwordHash !== data.password) {
       throw new AuthError("E-mail ou senha inválidos.");
     }
+    if (user.status === "BANIDO") {
+      throw new AuthError("Esta conta foi banida da plataforma.");
+    }
     return { token: generateMockToken(user.id), user: toPublicUser(user) };
+  },
+
+  // Decodifica o token mock (Base64 de "userId:timestamp") e retorna o usuário.
+  // TODO: substituir por verificação de assinatura JWT real em produção.
+  async getUserFromToken(token: string): Promise<User | null> {
+    try {
+      const decoded = Buffer.from(token, "base64").toString("utf-8");
+      const userId = decoded.split(":")[0];
+      return userRepository.findById(userId);
+    } catch {
+      return null;
+    }
   },
 
   async getPublicProfile(id: string): Promise<PublicHostProfile> {
@@ -71,5 +88,28 @@ export const userService = {
     if (!user) throw new AuthError("Usuário não encontrado.");
     const { email, passwordHash, ...publicProfile } = user;
     return publicProfile;
+  },
+
+  // ---------- Operações administrativas ----------
+
+  async listAll(): Promise<Array<Omit<User, "passwordHash">>> {
+    const users = await userRepository.findAll();
+    return users.map(toPublicUser);
+  },
+
+  async toggleBan(id: string): Promise<Omit<User, "passwordHash">> {
+    const user = await userRepository.findById(id);
+    if (!user) throw new AuthError("Usuário não encontrado.");
+    const newStatus = user.status === "ATIVO" ? "BANIDO" : "ATIVO";
+    const updated = await userRepository.update(id, { status: newStatus });
+    return toPublicUser(updated as User);
+  },
+
+  async togglePromote(id: string): Promise<Omit<User, "passwordHash">> {
+    const user = await userRepository.findById(id);
+    if (!user) throw new AuthError("Usuário não encontrado.");
+    const newRole = user.role === "admin" ? "user" : "admin";
+    const updated = await userRepository.update(id, { role: newRole });
+    return toPublicUser(updated as User);
   },
 };

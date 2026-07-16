@@ -13,7 +13,7 @@ import {
 
 export interface IOfficeRepository {
   create(data: CreateOfficeDTO): Promise<Office>;
-  findAll(filters?: { ownerId?: string; status?: string }): Promise<Office[]>;
+  findAll(filters?: { ownerId?: string; status?: string; moderationStatus?: string }): Promise<Office[]>;
   findById(id: string): Promise<Office | null>;
   update(id: string, data: UpdateOfficeDTO): Promise<Office | null>;
   delete(id: string): Promise<boolean>;
@@ -48,6 +48,7 @@ class OfficeInMemoryRepository implements IOfficeRepository {
         shiftPrices: [{ shift: "MANHA", price: 250 }, { shift: "TARDE", price: 250 }],
         equipments: ["RAIO_X", "AUTOCLAVE", "AR_CONDICIONADO", "WIFI"],
         status: "ATIVO",
+        moderationStatus: "APROVADO",
         imageUrl: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=800&auto=format&fit=crop",
         images: [
           "https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=1200&auto=format&fit=crop",
@@ -74,6 +75,7 @@ class OfficeInMemoryRepository implements IOfficeRepository {
         shiftPrices: [{ shift: "TARDE", price: 180 }, { shift: "NOITE", price: 200 }],
         equipments: ["CADEIRA_ODONTOLOGICA", "AUTOCLAVE", "WIFI"],
         status: "ATIVO",
+        moderationStatus: "APROVADO",
         imageUrl: "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?q=80&w=800&auto=format&fit=crop",
         images: [
           "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?q=80&w=1200&auto=format&fit=crop",
@@ -98,6 +100,7 @@ class OfficeInMemoryRepository implements IOfficeRepository {
         shiftPrices: [{ shift: "MANHA", price: 300 }, { shift: "TARDE", price: 300 }, { shift: "NOITE", price: 260 }],
         equipments: ["RAIO_X", "AUTOCLAVE", "COMPRESSOR", "FOTOPOLIMERIZADOR", "AR_CONDICIONADO"],
         status: "ATIVO",
+        moderationStatus: "APROVADO",
         imageUrl: "https://images.unsplash.com/photo-1629909615184-74f495363b67?q=80&w=800&auto=format&fit=crop",
         images: [
           "https://images.unsplash.com/photo-1629909615184-74f495363b67?q=80&w=1200&auto=format&fit=crop",
@@ -123,6 +126,7 @@ class OfficeInMemoryRepository implements IOfficeRepository {
         shiftPrices: [{ shift: "MANHA", price: 210 }, { shift: "TARDE", price: 210 }],
         equipments: ["CADEIRA_ODONTOLOGICA", "WIFI"],
         status: "ATIVO",
+        moderationStatus: "APROVADO",
         imageUrl: "https://images.unsplash.com/photo-1629909613645-a3e0e1c3d3a3?q=80&w=800&auto=format&fit=crop",
         images: [
           "https://images.unsplash.com/photo-1629909613645-a3e0e1c3d3a3?q=80&w=1200&auto=format&fit=crop",
@@ -150,6 +154,7 @@ class OfficeInMemoryRepository implements IOfficeRepository {
     const office: Office = {
       id: randomUUID(),
       status: data.status ?? "ATIVO",
+      moderationStatus: data.moderationStatus ?? "PENDENTE",
       images: data.images ?? (data.imageUrl ? [data.imageUrl] : []),
       reviews: data.reviews ?? [],
       createdAt: now,
@@ -160,7 +165,7 @@ class OfficeInMemoryRepository implements IOfficeRepository {
     return office;
   }
 
-  async findAll(filters?: { ownerId?: string; status?: string }): Promise<Office[]> {
+  async findAll(filters?: { ownerId?: string; status?: string; moderationStatus?: string }): Promise<Office[]> {
     let result = [...this.offices];
 
     if (filters?.ownerId) {
@@ -169,6 +174,10 @@ class OfficeInMemoryRepository implements IOfficeRepository {
 
     if (filters?.status) {
       result = result.filter((o) => o.status === filters.status);
+    }
+
+    if (filters?.moderationStatus) {
+      result = result.filter((o) => o.moderationStatus === filters.moderationStatus);
     }
 
     return result.sort(

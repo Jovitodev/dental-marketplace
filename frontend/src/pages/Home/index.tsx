@@ -21,7 +21,7 @@ export default function Home() {
       try {
         setLoading(true);
         setError(null);
-        const data = await officeService.list({ status: "ATIVO" });
+        const data = await officeService.list({ status: "ATIVO", moderationStatus: "APROVADO" });
         setOffices(data);
       } catch {
         setError("Não foi possível carregar os consultórios. Verifique se a API está rodando.");

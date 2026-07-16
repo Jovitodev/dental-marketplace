@@ -24,10 +24,11 @@ export const officeController = {
 
   async list(req: Request, res: Response) {
     try {
-      const { ownerId, status } = req.query;
+      const { ownerId, status, moderationStatus } = req.query;
       const offices = await officeService.list({
         ownerId: ownerId as string | undefined,
         status: status as string | undefined,
+        moderationStatus: moderationStatus as string | undefined,
       });
       return res.status(200).json(offices);
     } catch (error) {

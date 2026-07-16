@@ -30,10 +30,12 @@ function validateCreateDTO(data: CreateOfficeDTO) {
 export const officeService = {
   async create(data: CreateOfficeDTO): Promise<Office> {
     validateCreateDTO(data);
-    return officeRepository.create(data);
+    // Segurança: todo consultório nasce PENDENTE, independentemente do
+    // que vier no corpo da requisição — só um admin pode aprovar.
+    return officeRepository.create({ ...data, moderationStatus: "PENDENTE" });
   },
 
-  async list(filters?: { ownerId?: string; status?: string }): Promise<Office[]> {
+  async list(filters?: { ownerId?: string; status?: string; moderationStatus?: string }): Promise<Office[]> {
     return officeRepository.findAll(filters);
   },
 
@@ -65,5 +67,23 @@ export const officeService = {
   async remove(id: string): Promise<void> {
     const deleted = await officeRepository.delete(id);
     if (!deleted) throw new OfficeValidationError("Consultório não encontrado.");
+  },
+
+  // ---------- Moderação (usado pelo painel /admin) ----------
+
+  async listPending(): Promise<Office[]> {
+    return officeRepository.findAll({ moderationStatus: "PENDENTE" });
+  },
+
+  async approve(id: string): Promise<Office> {
+    const updated = await officeRepository.update(id, { moderationStatus: "APROVADO" });
+    if (!updated) throw new OfficeValidationError("Consultório não encontrado.");
+    return updated;
+  },
+
+  async reject(id: string): Promise<Office> {
+    const updated = await officeRepository.update(id, { moderationStatus: "RECUSADO" });
+    if (!updated) throw new OfficeValidationError("Consultório não encontrado.");
+    return updated;
   },
 };

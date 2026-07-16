@@ -122,7 +122,7 @@ export default function OfficeForm() {
       } else {
         await officeService.create(payload);
       }
-      navigate("/");
+      navigate("/dashboard");
     } catch (err: any) {
       setError(err?.response?.data?.message || "Erro ao salvar o consultório.");
     } finally {

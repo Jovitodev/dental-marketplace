@@ -3,6 +3,9 @@
 // cadastrar o seu próprio (virando "anfitrião"), sem precisar de um
 // tipo de conta separado. Por isso o model não tem "role" fixa.
 
+export type UserRole = "user" | "admin";
+export type UserStatus = "ATIVO" | "BANIDO";
+
 export interface PublicHostProfile {
   id: string;
   name: string;
@@ -14,6 +17,8 @@ export interface PublicHostProfile {
   yearsHosting: number;
   responseRate: number; // 0-100
   responseTime: string; // ex: "Responde em até 1 hora"
+  role: UserRole;
+  status: UserStatus;
 }
 
 export interface User extends PublicHostProfile {

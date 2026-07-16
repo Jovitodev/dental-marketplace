@@ -4,6 +4,7 @@
 // (ou futuramente extraia para um pacote "shared" em um monorepo).
 
 export type OfficeStatus = "ATIVO" | "INATIVO";
+export type ModerationStatus = "PENDENTE" | "APROVADO" | "RECUSADO";
 export type Shift = "MANHA" | "TARDE" | "NOITE";
 
 export interface Address {
@@ -52,6 +53,7 @@ export interface Office {
   shiftPrices: ShiftPrice[];
   equipments: Equipment[];
   status: OfficeStatus;
+  moderationStatus?: ModerationStatus;
   imageUrl?: string;
   images?: string[];
   reviews?: Review[];
@@ -69,6 +71,7 @@ export interface CreateOfficeDTO {
   shiftPrices: ShiftPrice[];
   equipments: Equipment[];
   status?: OfficeStatus;
+  moderationStatus?: ModerationStatus;
   imageUrl?: string;
   images?: string[];
   reviews?: Review[];

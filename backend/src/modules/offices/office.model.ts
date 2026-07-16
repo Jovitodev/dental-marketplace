@@ -4,6 +4,11 @@
 
 export type OfficeStatus = "ATIVO" | "INATIVO";
 
+// Moderação é independente do status ATIVO/INATIVO (que é controlado
+// pelo próprio proprietário). Todo consultório novo nasce PENDENTE e só
+// aparece na busca pública depois que um admin aprova em /admin.
+export type ModerationStatus = "PENDENTE" | "APROVADO" | "RECUSADO";
+
 export type Shift = "MANHA" | "TARDE" | "NOITE";
 
 export interface Address {
@@ -50,6 +55,7 @@ export interface Office {
   shiftPrices: ShiftPrice[]; // Preço por turno (Manhã/Tarde/Noite)
   equipments: Equipment[];
   status: OfficeStatus;
+  moderationStatus: ModerationStatus;
   imageUrl?: string; // Imagem de capa (usada no card estilo Airbnb)
   images?: string[]; // Galeria de fotos (usada na tela de detalhes)
   reviews?: Review[]; // Avaliações do consultório
@@ -68,6 +74,7 @@ export interface CreateOfficeDTO {
   shiftPrices: ShiftPrice[];
   equipments: Equipment[];
   status?: OfficeStatus;
+  moderationStatus?: ModerationStatus;
   imageUrl?: string;
   images?: string[];
   reviews?: Review[];

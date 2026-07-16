@@ -1,5 +1,8 @@
 // Espelha backend/src/modules/users/user.model.ts
 
+export type UserRole = "user" | "admin";
+export type UserStatus = "ATIVO" | "BANIDO";
+
 export interface PublicHostProfile {
   id: string;
   name: string;
@@ -11,6 +14,8 @@ export interface PublicHostProfile {
   yearsHosting: number;
   responseRate: number;
   responseTime: string;
+  role: UserRole;
+  status: UserStatus;
 }
 
 export interface User extends PublicHostProfile {

@@ -54,7 +54,17 @@ export default function OfficeCard({
         <img src={office.imageUrl || PLACEHOLDER_IMAGE} alt={office.title} loading="lazy" />
 
         {managementMode && (
-          <span className={`office-card-badge`}>{office.status === "ATIVO" ? "Ativo" : "Inativo"}</span>
+          <span className="office-card-badge">{office.status === "ATIVO" ? "Ativo" : "Inativo"}</span>
+        )}
+
+        {managementMode && office.moderationStatus && office.moderationStatus !== "APROVADO" && (
+          <span
+            className={`office-card-badge moderation-badge ${
+              office.moderationStatus === "PENDENTE" ? "pending" : "rejected"
+            }`}
+          >
+            {office.moderationStatus === "PENDENTE" ? "Aguardando aprovação" : "Recusado pelo admin"}
+          </span>
         )}
 
         <button

@@ -1,8 +1,6 @@
 import { api } from "./api";
+import { tokenStorage } from "./tokenStorage";
 import { AuthResponse, LoginPayload, PublicHostProfile, RegisterPayload, User } from "../types/user";
-
-const TOKEN_KEY = "dental_marketplace_token";
-const USER_KEY = "dental_marketplace_user";
 
 export const authService = {
   async register(payload: RegisterPayload): Promise<AuthResponse> {
@@ -23,12 +21,12 @@ export const authService = {
   },
 
   persistSession(auth: AuthResponse) {
-    localStorage.setItem(TOKEN_KEY, auth.token);
-    localStorage.setItem(USER_KEY, JSON.stringify(auth.user));
+    tokenStorage.setToken(auth.token);
+    localStorage.setItem(tokenStorage.USER_KEY, JSON.stringify(auth.user));
   },
 
   getStoredUser(): User | null {
-    const raw = localStorage.getItem(USER_KEY);
+    const raw = localStorage.getItem(tokenStorage.USER_KEY);
     if (!raw) return null;
     try {
       return JSON.parse(raw) as User;
@@ -38,11 +36,10 @@ export const authService = {
   },
 
   getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+    return tokenStorage.getToken();
   },
 
   logout() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    tokenStorage.clear();
   },
 };
