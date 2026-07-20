@@ -65,6 +65,22 @@ export default function Header() {
             Meus Anúncios
           </span>
         )}
+        {isAuthenticated && (
+          <span
+            className={`navbar-link ${location.pathname === "/proposals/received" ? "active" : ""}`}
+            onClick={() => navigate("/proposals/received")}
+          >
+            Propostas Recebidas
+          </span>
+        )}
+        {isAuthenticated && (
+          <span
+            className={`navbar-link ${location.pathname === "/proposals/sent" ? "active" : ""}`}
+            onClick={() => navigate("/proposals/sent")}
+          >
+            Minhas Propostas
+          </span>
+        )}
         {isAuthenticated && user?.role === "admin" && (
           <span
             className={`navbar-link ${location.pathname.startsWith("/admin") ? "active" : ""}`}

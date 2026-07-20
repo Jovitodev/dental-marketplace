@@ -11,6 +11,30 @@ export type ModerationStatus = "PENDENTE" | "APROVADO" | "RECUSADO";
 
 export type Shift = "MANHA" | "TARDE" | "NOITE";
 
+// Dias da semana em que o proprietário disponibiliza o consultório.
+export type Weekday = "SEG" | "TER" | "QUA" | "QUI" | "SEX" | "SAB" | "DOM";
+
+export const WEEKDAY_ORDER: Weekday[] = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"];
+
+// Mapeia Date.getDay() (0=domingo) para o enum Weekday usado no sistema.
+export const JS_WEEKDAY_TO_WEEKDAY: Record<number, Weekday> = {
+  0: "DOM",
+  1: "SEG",
+  2: "TER",
+  3: "QUA",
+  4: "QUI",
+  5: "SEX",
+  6: "SAB",
+};
+
+// Procedimento/serviço que pode ser realizado no consultório, com preço próprio
+// (independente do preço genérico por turno em ShiftPrice).
+export interface OfficeService {
+  id: string;
+  name: string; // ex: "Procedimento de Canal"
+  price: number; // ex: 200 (R$ por turno)
+}
+
 export interface Address {
   street: string; // Rua/Avenida
   number: string;
@@ -54,6 +78,8 @@ export interface Office {
   address: Address;
   shiftPrices: ShiftPrice[]; // Preço por turno (Manhã/Tarde/Noite)
   equipments: Equipment[];
+  availableWeekdays: Weekday[]; // Dias da semana em que o consultório aceita reservas
+  services: OfficeService[]; // Procedimentos oferecidos, cada um com preço próprio
   status: OfficeStatus;
   moderationStatus: ModerationStatus;
   imageUrl?: string; // Imagem de capa (usada no card estilo Airbnb)
@@ -73,6 +99,8 @@ export interface CreateOfficeDTO {
   address: Address;
   shiftPrices: ShiftPrice[];
   equipments: Equipment[];
+  availableWeekdays: Weekday[];
+  services: OfficeService[];
   status?: OfficeStatus;
   moderationStatus?: ModerationStatus;
   imageUrl?: string;

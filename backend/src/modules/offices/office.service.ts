@@ -25,6 +25,14 @@ function validateCreateDTO(data: CreateOfficeDTO) {
     if (sp.price < 0) throw new OfficeValidationError("O preço do turno não pode ser negativo.");
   });
   if (!data.equipments) throw new OfficeValidationError("equipments é obrigatório (pode ser lista vazia).");
+  if (!data.availableWeekdays || data.availableWeekdays.length === 0) {
+    throw new OfficeValidationError("Selecione ao menos um dia da semana disponível.");
+  }
+  if (!data.services) throw new OfficeValidationError("services é obrigatório (pode ser lista vazia).");
+  data.services.forEach((s) => {
+    if (!s.name?.trim()) throw new OfficeValidationError("Todo procedimento precisa de um nome.");
+    if (s.price < 0) throw new OfficeValidationError("O preço do procedimento não pode ser negativo.");
+  });
 }
 
 export const officeService = {

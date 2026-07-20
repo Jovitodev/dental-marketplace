@@ -6,6 +6,25 @@
 export type OfficeStatus = "ATIVO" | "INATIVO";
 export type ModerationStatus = "PENDENTE" | "APROVADO" | "RECUSADO";
 export type Shift = "MANHA" | "TARDE" | "NOITE";
+export type Weekday = "SEG" | "TER" | "QUA" | "QUI" | "SEX" | "SAB" | "DOM";
+
+export const WEEKDAY_ORDER: Weekday[] = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"];
+
+export const WEEKDAY_LABELS: Record<Weekday, string> = {
+  SEG: "Segunda",
+  TER: "Terça",
+  QUA: "Quarta",
+  QUI: "Quinta",
+  SEX: "Sexta",
+  SAB: "Sábado",
+  DOM: "Domingo",
+};
+
+export interface OfficeService {
+  id: string;
+  name: string;
+  price: number;
+}
 
 export interface Address {
   street: string;
@@ -52,6 +71,8 @@ export interface Office {
   address: Address;
   shiftPrices: ShiftPrice[];
   equipments: Equipment[];
+  availableWeekdays: Weekday[];
+  services: OfficeService[];
   status: OfficeStatus;
   moderationStatus?: ModerationStatus;
   imageUrl?: string;
@@ -70,6 +91,8 @@ export interface CreateOfficeDTO {
   address: Address;
   shiftPrices: ShiftPrice[];
   equipments: Equipment[];
+  availableWeekdays: Weekday[];
+  services: OfficeService[];
   status?: OfficeStatus;
   moderationStatus?: ModerationStatus;
   imageUrl?: string;

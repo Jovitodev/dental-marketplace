@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import {
   CreateOfficeDTO,
   Office,
+  OfficeService,
   Review,
   UpdateOfficeDTO,
 } from "./office.model";
@@ -29,6 +30,11 @@ function makeReview(
   return { id: randomUUID(), authorName, authorAvatarUrl, rating, comment, date };
 }
 
+
+function makeService(name: string, price: number): OfficeService {
+  return { id: randomUUID(), name, price };
+}
+
 class OfficeInMemoryRepository implements IOfficeRepository {
   private offices: Office[] = [];
 
@@ -47,6 +53,12 @@ class OfficeInMemoryRepository implements IOfficeRepository {
         address: { street: "Av. Beira Mar", number: "1200", neighborhood: "Meireles", city: "Fortaleza", state: "CE", zipCode: "60165-121" },
         shiftPrices: [{ shift: "MANHA", price: 250 }, { shift: "TARDE", price: 250 }],
         equipments: ["RAIO_X", "AUTOCLAVE", "AR_CONDICIONADO", "WIFI"],
+        availableWeekdays: ["SEG", "TER", "QUA", "QUI", "SEX"],
+        services: [
+          makeService("Avaliação Geral", 120),
+          makeService("Procedimento de Canal", 200),
+          makeService("Limpeza / Profilaxia", 150),
+        ],
         status: "ATIVO",
         moderationStatus: "APROVADO",
         imageUrl: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=800&auto=format&fit=crop",
@@ -74,6 +86,11 @@ class OfficeInMemoryRepository implements IOfficeRepository {
         address: { street: "Rua Barão de Aracati", number: "540", neighborhood: "Aldeota", city: "Fortaleza", state: "CE", zipCode: "60115-081" },
         shiftPrices: [{ shift: "TARDE", price: 180 }, { shift: "NOITE", price: 200 }],
         equipments: ["CADEIRA_ODONTOLOGICA", "AUTOCLAVE", "WIFI"],
+        availableWeekdays: ["TER", "QUI"],
+        services: [
+          makeService("Avaliação Ortodôntica", 100),
+          makeService("Manutenção de Aparelho", 130),
+        ],
         status: "ATIVO",
         moderationStatus: "APROVADO",
         imageUrl: "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?q=80&w=800&auto=format&fit=crop",
@@ -99,6 +116,12 @@ class OfficeInMemoryRepository implements IOfficeRepository {
         address: { street: "Av. Zezé Diogo", number: "3400", neighborhood: "Praia do Futuro", city: "Fortaleza", state: "CE", zipCode: "60181-901" },
         shiftPrices: [{ shift: "MANHA", price: 300 }, { shift: "TARDE", price: 300 }, { shift: "NOITE", price: 260 }],
         equipments: ["RAIO_X", "AUTOCLAVE", "COMPRESSOR", "FOTOPOLIMERIZADOR", "AR_CONDICIONADO"],
+        availableWeekdays: ["SEG", "QUA", "SEX", "SAB"],
+        services: [
+          makeService("Extração", 250),
+          makeService("Implante Dentário", 600),
+          makeService("Cirurgia Simples", 350),
+        ],
         status: "ATIVO",
         moderationStatus: "APROVADO",
         imageUrl: "https://images.unsplash.com/photo-1629909615184-74f495363b67?q=80&w=800&auto=format&fit=crop",
@@ -125,6 +148,11 @@ class OfficeInMemoryRepository implements IOfficeRepository {
         address: { street: "Rua das Acácias", number: "88", neighborhood: "Serrinha", city: "Fortaleza", state: "CE", zipCode: "60741-030" },
         shiftPrices: [{ shift: "MANHA", price: 210 }, { shift: "TARDE", price: 210 }],
         equipments: ["CADEIRA_ODONTOLOGICA", "WIFI"],
+        availableWeekdays: ["SEG", "TER", "QUA", "QUI", "SEX", "SAB"],
+        services: [
+          makeService("Avaliação Geral", 110),
+          makeService("Clareamento Dental", 280),
+        ],
         status: "ATIVO",
         moderationStatus: "APROVADO",
         imageUrl: "https://images.unsplash.com/photo-1629909613645-a3e0e1c3d3a3?q=80&w=800&auto=format&fit=crop",

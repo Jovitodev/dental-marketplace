@@ -7,6 +7,8 @@ import OfficeForm from "./pages/OfficeForm";
 import OfficeDetails from "./pages/OfficeDetails";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import ReceivedProposals from "./pages/Proposals/Received";
+import SentProposals from "./pages/Proposals/Sent";
 
 // Layout raiz + definição de rotas.
 // Para novos módulos (ex: /chat, /reviews), adicione novas <Route> aqui
@@ -41,6 +43,22 @@ export default function App() {
           element={
             <ProtectedRoute>
               <OfficeForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/proposals/received"
+          element={
+            <ProtectedRoute>
+              <ReceivedProposals />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/proposals/sent"
+          element={
+            <ProtectedRoute>
+              <SentProposals />
             </ProtectedRoute>
           }
         />

@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { officeService } from "../../services/api";
 import { authService } from "../../services/auth";
-import { Office, SHIFT_LABELS, Shift } from "../../types/office";
+import { bookingService } from "../../services/booking";
+import { useAuth } from "../../context/AuthContext";
+import { Office, SHIFT_LABELS, Shift, WEEKDAY_LABELS } from "../../types/office";
 import { PublicHostProfile } from "../../types/user";
 import EquipmentIcon, { EQUIPMENT_DISPLAY_LABELS } from "../../components/EquipmentIcon";
 
@@ -17,6 +19,7 @@ function average(nums: number[]): number {
 export default function OfficeDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
   const [office, setOffice] = useState<Office | null>(null);
   const [host, setHost] = useState<PublicHostProfile | null>(null);
@@ -26,6 +29,11 @@ export default function OfficeDetails() {
 
   const [selectedShift, setSelectedShift] = useState<Shift | "">("");
   const [selectedDate, setSelectedDate] = useState("");
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
+  const [offeredPrice, setOfferedPrice] = useState("");
+  const [submittingProposal, setSubmittingProposal] = useState(false);
+  const [proposalError, setProposalError] = useState<string | null>(null);
+  const [proposalSuccess, setProposalSuccess] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -70,7 +78,60 @@ export default function OfficeDetails() {
     return padded.slice(0, 5);
   }, [office]);
 
-  const selectedPrice = office?.shiftPrices.find((sp) => sp.shift === selectedShift)?.price;
+  const selectedShiftPrice = office?.shiftPrices.find((sp) => sp.shift === selectedShift)?.price;
+  const selectedService = office?.services?.find((s) => s.id === selectedServiceId);
+  const listedPrice = selectedService?.price ?? selectedShiftPrice;
+
+  // Pré-preenche a oferta com o valor tabelado sempre que o dentista troca de
+  // procedimento/turno, mas sem sobrescrever se ele já digitou algo manualmente
+  // após a última troca (comportamento simples: reseta ao trocar seleção).
+  useEffect(() => {
+    if (listedPrice != null) {
+      setOfferedPrice(String(listedPrice));
+    }
+  }, [selectedServiceId, selectedShift]);
+
+  async function handleSendProposal() {
+    setProposalError(null);
+    setProposalSuccess(false);
+
+    if (!isAuthenticated) {
+      navigate("/auth");
+      return;
+    }
+
+    if (!office) return;
+
+    if (!selectedDate) {
+      setProposalError("Selecione uma data.");
+      return;
+    }
+    if (!selectedShift) {
+      setProposalError("Selecione um turno.");
+      return;
+    }
+    const priceNumber = Number(offeredPrice);
+    if (!offeredPrice || isNaN(priceNumber) || priceNumber <= 0) {
+      setProposalError("Informe um valor de oferta válido.");
+      return;
+    }
+
+    try {
+      setSubmittingProposal(true);
+      await bookingService.create({
+        officeId: office.id,
+        date: selectedDate,
+        shift: selectedShift,
+        serviceId: selectedServiceId || undefined,
+        offeredPrice: priceNumber,
+      });
+      setProposalSuccess(true);
+    } catch (err: any) {
+      setProposalError(err?.response?.data?.message || "Erro ao enviar a proposta.");
+    } finally {
+      setSubmittingProposal(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -214,39 +275,94 @@ export default function OfficeDetails() {
           )}
         </div>
 
-        {/* Card de reserva flutuante */}
+        {/* Card de proposta flutuante */}
         <aside className="booking-card">
-          <div className="booking-price">
-            <strong>R$ {selectedPrice?.toFixed(2) ?? "--"}</strong> / turno
-          </div>
+          {proposalSuccess ? (
+            <div className="proposal-success">
+              <span style={{ fontSize: 28 }}>✅</span>
+              <strong>Proposta enviada!</strong>
+              <p className="helper-text">
+                O anfitrião foi notificado e tem até 24 horas para responder. Acompanhe em "Minhas Propostas".
+              </p>
+              <button className="btn-secondary" style={{ width: "100%" }} onClick={() => navigate("/proposals/sent")}>
+                Ver minhas propostas
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="booking-price">
+                <strong>R$ {listedPrice?.toFixed(2) ?? "--"}</strong> / turno
+                <p className="helper-text" style={{ margin: "2px 0 0" }}>Valor tabelado — você pode propor outro abaixo</p>
+              </div>
 
-          <div className="field">
-            <label>Data</label>
-            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
-          </div>
+              <div className="field">
+                <label>Data</label>
+                <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+                {office.availableWeekdays?.length > 0 && (
+                  <p className="helper-text">
+                    Disponível: {office.availableWeekdays.map((d) => WEEKDAY_LABELS[d]).join(", ")}
+                  </p>
+                )}
+              </div>
 
-          <div className="field">
-            <label>Turno</label>
-            <select value={selectedShift} onChange={(e) => setSelectedShift(e.target.value as Shift)}>
-              {office.shiftPrices.map((sp) => (
-                <option key={sp.shift} value={sp.shift}>
-                  {SHIFT_LABELS[sp.shift]} · R$ {sp.price.toFixed(2)}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div className="field">
+                <label>Turno</label>
+                <select value={selectedShift} onChange={(e) => setSelectedShift(e.target.value as Shift)}>
+                  <option value="" disabled>Selecione um turno</option>
+                  {office.shiftPrices.map((sp) => (
+                    <option key={sp.shift} value={sp.shift}>
+                      {SHIFT_LABELS[sp.shift]} · R$ {sp.price.toFixed(2)}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <button
-            className="btn-primary"
-            style={{ width: "100%" }}
-            onClick={() => alert("Módulo de reservas ainda não implementado.")}
-          >
-            Reservar
-          </button>
+              {office.services && office.services.length > 0 && (
+                <div className="field">
+                  <label>Procedimento</label>
+                  <select value={selectedServiceId} onChange={(e) => setSelectedServiceId(e.target.value)}>
+                    <option value="">Turno padrão (sem procedimento específico)</option>
+                    {office.services.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} · R$ {s.price.toFixed(2)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-          <p className="helper-text" style={{ textAlign: "center", marginTop: 8 }}>
-            Você ainda não será cobrado
-          </p>
+              <div className="field">
+                <label>Sua oferta de valor (R$)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={offeredPrice}
+                  onChange={(e) => setOfferedPrice(e.target.value)}
+                />
+                <p className="helper-text">
+                  Pré-preenchido com o valor tabelado. Você pode ajustar para propor um valor diferente.
+                </p>
+              </div>
+
+              {proposalError && <p className="error-text">{proposalError}</p>}
+
+              <button
+                className="btn-primary"
+                style={{ width: "100%" }}
+                onClick={handleSendProposal}
+                disabled={submittingProposal}
+              >
+                {submittingProposal ? "Enviando..." : "Enviar Proposta"}
+              </button>
+
+              <p className="helper-text" style={{ textAlign: "center", marginTop: 8 }}>
+                {isAuthenticated
+                  ? "O anfitrião tem até 24 horas para responder"
+                  : "Você precisa entrar na sua conta para propor uma reserva"}
+              </p>
+            </>
+          )}
         </aside>
       </div>
     </div>

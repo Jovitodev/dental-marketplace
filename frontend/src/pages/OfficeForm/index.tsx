@@ -1,17 +1,19 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { officeService } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 import {
   Address,
   CreateOfficeDTO,
   EQUIPMENT_OPTIONS,
+  OfficeService,
   Shift,
   SHIFT_LABELS,
   ShiftPrice,
+  Weekday,
+  WEEKDAY_LABELS,
+  WEEKDAY_ORDER,
 } from "../../types/office";
-
-// TODO(auth): substituir pelo ID do proprietário autenticado.
-const CURRENT_OWNER_ID = "owner-demo-01";
 
 const ALL_SHIFTS: Shift[] = ["MANHA", "TARDE", "NOITE"];
 
@@ -25,8 +27,19 @@ const EMPTY_ADDRESS: Address = {
   zipCode: "",
 };
 
+interface DraftService {
+  id: string; // id local (client-side) para controlar a lista antes de salvar
+  name: string;
+  price: string;
+}
+
+function makeDraftId() {
+  return Math.random().toString(36).slice(2);
+}
+
 export default function OfficeForm() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { id } = useParams(); // presente somente em modo edição
   const isEditing = Boolean(id);
 
@@ -41,6 +54,10 @@ export default function OfficeForm() {
   });
   const [equipments, setEquipments] = useState<string[]>([]);
   const [customEquipment, setCustomEquipment] = useState("");
+  const [availableWeekdays, setAvailableWeekdays] = useState<Weekday[]>([]);
+  const [services, setServices] = useState<DraftService[]>([]);
+  const [newServiceName, setNewServiceName] = useState("");
+  const [newServicePrice, setNewServicePrice] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +74,10 @@ export default function OfficeForm() {
         setCroResponsible(office.croResponsible);
         setAddress(office.address);
         setEquipments(office.equipments);
+        setAvailableWeekdays(office.availableWeekdays ?? []);
+        setServices(
+          (office.services ?? []).map((s) => ({ id: s.id, name: s.name, price: String(s.price) }))
+        );
 
         const prices: Record<Shift, string> = { MANHA: "", TARDE: "", NOITE: "" };
         office.shiftPrices.forEach((sp) => {
@@ -88,11 +109,42 @@ export default function OfficeForm() {
     setCustomEquipment("");
   }
 
+  function toggleWeekday(day: Weekday) {
+    setAvailableWeekdays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
+  }
+
+  function addService() {
+    const name = newServiceName.trim();
+    const price = Number(newServicePrice);
+    if (!name) {
+      setError("Informe o nome do procedimento.");
+      return;
+    }
+    if (!newServicePrice || isNaN(price) || price <= 0) {
+      setError("Informe um preço válido para o procedimento.");
+      return;
+    }
+    setError(null);
+    setServices((prev) => [...prev, { id: makeDraftId(), name, price: newServicePrice }]);
+    setNewServiceName("");
+    setNewServicePrice("");
+  }
+
+  function removeService(draftId: string) {
+    setServices((prev) => prev.filter((s) => s.id !== draftId));
+  }
+
   function buildShiftPricesPayload(): ShiftPrice[] {
     return ALL_SHIFTS.filter((shift) => shiftPrices[shift].trim() !== "").map((shift) => ({
       shift,
       price: Number(shiftPrices[shift]),
     }));
+  }
+
+  function buildServicesPayload(): OfficeService[] {
+    return services.map((s) => ({ id: s.id, name: s.name, price: Number(s.price) }));
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -105,14 +157,26 @@ export default function OfficeForm() {
       return;
     }
 
+    if (availableWeekdays.length === 0) {
+      setError("Selecione ao menos um dia da semana disponível.");
+      return;
+    }
+
+    if (!user) {
+      setError("Você precisa estar logado para cadastrar um consultório.");
+      return;
+    }
+
     const payload: CreateOfficeDTO = {
-      ownerId: CURRENT_OWNER_ID,
+      ownerId: user.id,
       title,
       description,
       croResponsible,
       address,
       shiftPrices: priceList,
       equipments,
+      availableWeekdays,
+      services: buildServicesPayload(),
     };
 
     try {
@@ -250,8 +314,30 @@ export default function OfficeForm() {
         </div>
 
         <div className="form-section">
+          <h2>Disponibilidade</h2>
+          <p className="helper-text">Selecione os dias da semana em que este consultório aceita reservas.</p>
+
+          <div className="weekday-grid">
+            {WEEKDAY_ORDER.map((day) => (
+              <label
+                className={`weekday-chip ${availableWeekdays.includes(day) ? "selected" : ""}`}
+                key={day}
+              >
+                <input
+                  type="checkbox"
+                  checked={availableWeekdays.includes(day)}
+                  onChange={() => toggleWeekday(day)}
+                  style={{ display: "none" }}
+                />
+                {WEEKDAY_LABELS[day]}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="form-section">
           <h2>Preço por Turno</h2>
-          <p className="helper-text">Deixe em branco os turnos indisponíveis.</p>
+          <p className="helper-text">Deixe em branco os turnos indisponíveis. Usado quando o dentista não escolhe um procedimento específico.</p>
 
           {ALL_SHIFTS.map((shift) => (
             <div className="shift-row" key={shift}>
@@ -268,6 +354,52 @@ export default function OfficeForm() {
               />
             </div>
           ))}
+        </div>
+
+        <div className="form-section">
+          <h2>Procedimentos Oferecidos</h2>
+          <p className="helper-text">
+            Cadastre os procedimentos que podem ser realizados neste consultório, cada um com seu próprio valor por turno.
+          </p>
+
+          {services.length > 0 && (
+            <div className="service-list">
+              {services.map((s) => (
+                <div className="service-list-item" key={s.id}>
+                  <span>{s.name}</span>
+                  <strong>R$ {Number(s.price).toFixed(2)}</strong>
+                  <button type="button" onClick={() => removeService(s.id)} aria-label="Remover procedimento">
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="grid-2" style={{ marginTop: 12 }}>
+            <div className="field">
+              <label>Nome do procedimento</label>
+              <input
+                value={newServiceName}
+                onChange={(e) => setNewServiceName(e.target.value)}
+                placeholder="Ex: Procedimento de Canal"
+              />
+            </div>
+            <div className="field">
+              <label>Preço (R$/turno)</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={newServicePrice}
+                onChange={(e) => setNewServicePrice(e.target.value)}
+                placeholder="Ex: 200"
+              />
+            </div>
+          </div>
+          <button type="button" className="btn-secondary" onClick={addService}>
+            + Adicionar procedimento
+          </button>
         </div>
 
         <div className="form-section">
@@ -314,7 +446,7 @@ export default function OfficeForm() {
         {error && <p className="error-text">{error}</p>}
 
         <div className="form-actions" style={{ marginBottom: 32 }}>
-          <button type="button" className="btn-secondary" onClick={() => navigate("/")}>
+          <button type="button" className="btn-secondary" onClick={() => navigate("/dashboard")}>
             Cancelar
           </button>
           <button type="submit" className="btn-primary" disabled={submitting}>
