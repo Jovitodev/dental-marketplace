@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { adminService } from "../../services/admin";
 import { User } from "../../types/user";
 import { useAuth } from "../../context/AuthContext";
@@ -32,8 +33,9 @@ export default function UsersManagement() {
       setActingId(id);
       const updated = await adminService.toggleBanUser(id);
       setUsers((prev) => prev.map((u) => (u.id === id ? updated : u)));
+      toast.success(updated.status === "BANIDO" ? "Usuário banido." : "Usuário reativado.");
     } catch (err: any) {
-      alert(err?.response?.data?.message || "Erro ao alterar o status do usuário.");
+      toast.error(err?.response?.data?.message || "Erro ao alterar o status do usuário.");
     } finally {
       setActingId(null);
     }
@@ -44,8 +46,9 @@ export default function UsersManagement() {
       setActingId(id);
       const updated = await adminService.togglePromoteUser(id);
       setUsers((prev) => prev.map((u) => (u.id === id ? updated : u)));
+      toast.success(updated.role === "admin" ? "Usuário promovido a admin." : "Permissão de admin removida.");
     } catch (err: any) {
-      alert(err?.response?.data?.message || "Erro ao alterar a permissão do usuário.");
+      toast.error(err?.response?.data?.message || "Erro ao alterar a permissão do usuário.");
     } finally {
       setActingId(null);
     }

@@ -1,109 +1,77 @@
-# Dental Marketplace (DentSpot) — Propostas de Reserva e Negociação
+# Dental Marketplace (DentSpot) — Polimento de MVP: Toasts, Validações e Máscaras
 
 Marketplace de aluguel de consultórios odontológicos (estilo Airbnb).
-Cadastro único, painel admin, e agora o **fluxo completo de propostas de
-reserva**: disponibilidade por dia da semana, procedimentos com preço
-próprio, oferta de valor pelo dentista, aceite/recusa/negociação pelo
-proprietário e uma regra de conflito de agenda entre clínicas diferentes.
+Esta rodada foca em **UX de erro/sucesso** e **validação rígida de
+formulários**, preparando o MVP para produção.
 
 ## Novidades desta rodada
 
-### 1. Disponibilidade e Procedimentos (Proprietário)
-No `OfficeForm`, o proprietário agora define:
-- **Dias da semana disponíveis** (chips selecionáveis: Segunda a Domingo).
-- **Procedimentos oferecidos**, cada um com nome e preço próprio (ex: "Procedimento de
-  Canal — R$ 200/turno"), independente do preço genérico por turno.
+### Etapa 1 — Notificações visuais (Toasts)
+- Biblioteca **sonner** configurada globalmente em `main.tsx` (`<Toaster />`,
+  canto superior direito, cantos arredondados, `richColors`).
+- Toasts de sucesso/erro em:
+  - **Login/Cadastro** (`pages/Auth`): "Bem-vindo de volta!" ou "E-mail ou
+    senha incorretos" no login; mensagens equivalentes no cadastro.
+  - **Cadastro de consultório** (`pages/OfficeForm`): "Consultório cadastrado
+    com sucesso!" / "Consultório atualizado com sucesso!" ou erro da API.
+  - **Envio de proposta e de mensagem ao anfitrião** (`pages/OfficeDetails`):
+    "Proposta enviada com sucesso!" e "Mensagem enviada com sucesso!".
+  - **Chat de propostas/conversas** (`components/ChatModal`, usado por
+    `ProposalChat` e `ConversationChat`): toast centralizado num único
+    lugar (o modal genérico), evitando duplicar a lógica nos dois wrappers.
+  - Como extra de consistência, **todos os `alert()` restantes no app**
+    (Meus Anúncios, Moderação de Clínicas, Gestão de Usuários, Propostas
+    Recebidas) foram substituídos por toasts.
+- **Bug corrigido de brinde:** `OfficeList` (Meus Anúncios) usava um
+  `ownerId` fixo (`owner-demo-01`) em vez do usuário autenticado — qualquer
+  pessoa logada via os consultórios da Paula. Agora usa `useAuth().user.id`.
 
-### 2. Fluxo de Proposta (Dentista) — `OfficeDetails`
-O botão "Reservar" virou **"Enviar Proposta"**. O painel lateral permite escolher:
-Data · Turno · Procedimento (opcional) · **Oferta de Valor** (pré-preenchida com o
-preço tabelado, mas editável). Ao enviar, o backend:
-1. Valida que o dia da semana está entre os disponibilizados pelo consultório.
-2. Valida que o dentista **não tem outra proposta pendente/aceita no mesmo dia+turno**
-   em qualquer outro consultório (regra de conflito de agenda).
-3. Cria o registro com `status: "PENDENTE_APROVACAO"`.
-4. Gera automaticamente a primeira mensagem estruturada no chat da proposta.
+### Etapa 2 — Validações e máscaras (`pages/OfficeForm`)
+- **Campo CRO**: máscara em tempo real no formato `12345-SP` (dígitos + sigla
+  do estado), implementada em `utils/masks.ts` (`formatCRO`, `isValidCRO`).
+  Validação obrigatória via regex `^\d{4,6}-[A-Z]{2}$`.
+  - Dados legados no formato antigo (ex: `"CRO-CE 10234"`, usado no seed) são
+    **normalizados automaticamente** ao carregar um consultório para edição,
+    evitando que o botão de salvar fique travado por causa de dado antigo.
+- **Preço por Turno / Procedimentos / Oferta de valor**: máscara de moeda
+  brasileira em tempo real (`components/CurrencyInput`), usando a técnica
+  "dígitos = centavos" (como em apps bancários). O componente sempre reporta
+  ao componente pai o **valor numérico puro** (ex: `250.5`) — a formatação
+  `R$ 250,50` é só visual. Usado em: preços por turno e de procedimentos no
+  `OfficeForm`, e na "oferta de valor" no `OfficeDetails`.
+- **Botão "Salvar Consultório" desabilitado** até que todos os campos
+  obrigatórios estejam válidos: Título, Descrição, CRO (formato correto),
+  Endereço completo, ao menos um Preço de Turno e ao menos um dia da semana
+  disponível.
 
-### 3. Painéis de Propostas
-- **`/proposals/received`** (proprietário): cada card tem **Aceitar Oferta**,
-  **Recusar Oferta** e **Negociar** (abre o chat da proposta).
-- **`/proposals/sent`** (dentista): acompanha o status de cada proposta enviada
-  e pode continuar a negociação pelo mesmo chat.
-- Como o cadastro é único, qualquer usuário logado vê os dois links no menu —
-  pode ser dentista e anfitrião ao mesmo tempo.
-- Enviar uma mensagem manual no chat durante a análise muda o status para
-  `NEGOCIACAO` automaticamente.
-
-### 4. Regra de conflito de agenda
-Implementada no backend (`booking.service.ts`): antes de criar uma proposta,
-o sistema verifica se o mesmo dentista já tem uma proposta `PENDENTE_APROVACAO`
-ou `ACEITO` na mesma data e turno — mesmo em uma clínica diferente — e bloqueia
-com erro `400` explicando o conflito.
-
-## Segurança (fechada nesta rodada)
-As rotas de escrita de `offices` (`POST/PUT/PATCH/DELETE`) agora exigem
-`requireAuth`, e o `ownerId` é sempre derivado de `req.authUser.id` — nunca do
-corpo da requisição. Update/toggle/delete também checam posse (só o dono ou um
-admin pode alterar). Todas as rotas de `bookings` exigem autenticação; o
-`dentistId` também vem sempre do usuário autenticado.
-
-> ⚠️ Autenticação continua **mockada** (token fake em Base64, senha em texto
-> puro) — troque por JWT assinado + bcrypt/argon2 antes de produção.
-
-## Arquitetura
+## Arquitetura (arquivos novos/alterados nesta rodada)
 
 ```
-dental-marketplace/
-├── backend/
-│   └── src/
-│       ├── shared/middlewares/   # requireAuth / requireAdmin
-│       └── modules/
-│           ├── offices/  # + availableWeekdays (Weekday[]) e services (OfficeService[])
-│           ├── users/
-│           ├── admin/
-│           └── bookings/  # NOVO: propostas de reserva, chat embutido, regra de conflito
-│               ├── booking.model.ts
-│               ├── booking.repository.ts
-│               ├── booking.service.ts    # regra de negócio central
-│               ├── booking.controller.ts
-│               └── booking.routes.ts
-└── frontend/
-    └── src/
-        ├── components/
-        │   ├── ProposalCard/    # card de proposta (usado nas duas telas)
-        │   ├── ProposalChat/    # modal de chat/negociação de uma proposta
-        │   └── ... (Header, Logo, SearchBar, OfficeCard, EquipmentIcon, ProtectedRoute)
-        ├── pages/
-        │   ├── OfficeForm/      # + dias da semana + procedimentos
-        │   ├── OfficeDetails/   # botão "Enviar Proposta" + painel de oferta
-        │   └── Proposals/
-        │       ├── Received/    # painel do proprietário
-        │       └── Sent/        # "Minhas Propostas" do dentista
-        └── services/
-            ├── booking.ts        # NOVO
-            └── ... (api.ts, auth.ts, admin.ts, tokenStorage.ts)
+frontend/src/
+├── utils/masks.ts              # NOVO: formatCRO, isValidCRO
+├── components/
+│   └── CurrencyInput/          # NOVO: input com máscara de moeda BRL
+├── pages/
+│   ├── Auth/                   # + toasts de sucesso/erro
+│   ├── OfficeForm/             # + máscaras, validação, botão desabilitado, toasts
+│   ├── OfficeDetails/          # + toasts, CurrencyInput na oferta de valor
+│   ├── OfficeList/             # + toasts, corrigido bug do ownerId fixo
+│   ├── Admin/Moderation.tsx    # + toasts (era alert)
+│   ├── Admin/Users.tsx         # + toasts (era alert)
+│   └── Proposals/Received/     # + toasts (era alert)
+├── components/ChatModal/       # + toast de envio de mensagem (usado por
+│                                  ProposalChat e ConversationChat)
+└── main.tsx                    # + <Toaster /> do sonner
 ```
 
-## Rotas do Frontend
-| Rota | Página | Proteção |
-|---|---|---|
-| `/` | Home | Pública |
-| `/offices/:id` | OfficeDetails (agora com "Enviar Proposta") | Pública (envio exige login) |
-| `/proposals/received` | Propostas recebidas (proprietário) | Requer login |
-| `/proposals/sent` | Minhas propostas (dentista) | Requer login |
-| `/dashboard`, `/offices/new`, `/offices/:id/edit` | Gestão de consultórios | Requer login |
-| `/admin` | Painel admin | Requer login + role admin |
-
-## Endpoints novos (backend)
-| Método | Rota | Descrição |
-|---|---|---|
-| POST | /api/bookings | Cria uma proposta (valida disponibilidade + conflito) |
-| GET | /api/bookings/received | Propostas recebidas pelo proprietário logado |
-| GET | /api/bookings/sent | Propostas enviadas pelo dentista logado |
-| GET | /api/bookings/:id | Detalhe de uma proposta (só participantes) |
-| PATCH | /api/bookings/:id/accept | Proprietário aceita |
-| PATCH | /api/bookings/:id/reject | Proprietário recusa |
-| POST | /api/bookings/:id/messages | Envia mensagem no chat da proposta (inicia `NEGOCIACAO`) |
+## Testes realizados
+As funções puras de máscara (`formatCRO`, `isValidCRO`, formatação de
+centavos) foram testadas isoladamente em Node antes do empacotamento,
+incluindo o caso real dos 4 consultórios do seed (formato antigo
+`"CRO-CE 10234"` → convertido corretamente para `"10234-CE"`). O backend foi
+testado em runtime aceitando o novo formato de CRO e preços com centavos
+sem qualquer alteração necessária (o campo continua sendo uma string livre
+no schema — a validação de formato é 100% do frontend).
 
 ## Como rodar
 
@@ -113,18 +81,6 @@ cd backend
 npm install
 npm run dev
 ```
-
-Contas seed:
-| E-mail | Senha | Role |
-|---|---|---|
-| admin@dentspot.com | admin123 | admin |
-| paula@example.com | 123456 | user (dona do Meireles e da Praia do Futuro) |
-| marcelo@example.com | 123456 | user (dono do Studio Aldeota) |
-| camila@example.com | 123456 | user (dona do Serrinha) |
-
-Dica para testar o fluxo: logue como `marcelo@example.com`, envie uma proposta
-para um consultório da Paula; depois logue como `paula@example.com` e acesse
-`/proposals/received` para aceitar/recusar/negociar.
 
 ### Frontend (porta 5173)
 ```bash
@@ -136,10 +92,14 @@ npm run dev
 
 ## Stack
 - **Backend:** Node.js, Express, TypeScript, ts-node-dev.
-- **Frontend:** React 18, TypeScript, Vite, React Router, Axios, Context API, CSS puro com variáveis de tema.
+- **Frontend:** React 18, TypeScript, Vite, React Router, Axios, Context API,
+  **sonner** (toasts), CSS puro com variáveis de tema.
 
-## Próximos módulos sugeridos
-- `payments`: gerar a cobrança de fato quando uma proposta é aceita (hoje só muda o status)
-- Notificações em tempo real (hoje é preciso recarregar a tela para ver novas propostas/mensagens)
-- Cancelamento de proposta pelo dentista antes da resposta do proprietário
-- Regra adicional: bloquear duas propostas ACEITAS no mesmo consultório/data/turno (hoje só valida por dentista)
+## Próximos passos sugeridos
+- Validação de CRO também no backend (hoje é só uma string livre) — se o
+  requisito de formato for regra de negócio real, não só de UX.
+- Aplicar `CurrencyInput` também nos campos de preço exibidos em modo leitura
+  (ex: `<option>` do select de turno/procedimento em `OfficeDetails`), hoje
+  ainda formatados com `toFixed(2)` simples.
+- Testes automatizados (unitários para `masks.ts`/`CurrencyInput`, e2e para
+  o fluxo de cadastro) — os testes desta rodada foram manuais/pontuais.

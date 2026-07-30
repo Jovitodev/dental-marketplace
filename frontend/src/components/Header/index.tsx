@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import Logo from "../Logo";
+import ProfileMenu from "../ProfileMenu";
 import { useAuth } from "../../context/AuthContext";
 
 /**
@@ -12,11 +13,16 @@ import { useAuth } from "../../context/AuthContext";
  *
  * O link "Anuncie seu Consultório" segue a mesma regra: só aparece
  * para quem já está logado, e leva direto para /offices/new.
+ *
+ * Os destinos pessoais (Meus Anúncios, Propostas, Mensagens, Favoritos...)
+ * vivem no menu suspenso de perfil (ProfileMenu), não na navbar — mesmo
+ * padrão do Airbnb, onde a barra superior fica enxuta e o menu do avatar
+ * concentra a navegação pessoal.
  */
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   function handlePrimaryAction() {
     if (isAuthenticated) {
@@ -36,14 +42,6 @@ export default function Header() {
     }
   }
 
-  function handleLogout() {
-    const confirmed = window.confirm("Deseja sair da sua conta?");
-    if (confirmed) {
-      logout();
-      navigate("/");
-    }
-  }
-
   return (
     <header className="navbar">
       <div onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
@@ -57,30 +55,6 @@ export default function Header() {
         >
           Consultórios
         </span>
-        {isAuthenticated && (
-          <span
-            className={`navbar-link ${location.pathname === "/dashboard" ? "active" : ""}`}
-            onClick={() => navigate("/dashboard")}
-          >
-            Meus Anúncios
-          </span>
-        )}
-        {isAuthenticated && (
-          <span
-            className={`navbar-link ${location.pathname === "/proposals/received" ? "active" : ""}`}
-            onClick={() => navigate("/proposals/received")}
-          >
-            Propostas Recebidas
-          </span>
-        )}
-        {isAuthenticated && (
-          <span
-            className={`navbar-link ${location.pathname === "/proposals/sent" ? "active" : ""}`}
-            onClick={() => navigate("/proposals/sent")}
-          >
-            Minhas Propostas
-          </span>
-        )}
         {isAuthenticated && user?.role === "admin" && (
           <span
             className={`navbar-link ${location.pathname.startsWith("/admin") ? "active" : ""}`}
@@ -102,16 +76,7 @@ export default function Header() {
           {isAuthenticated ? "+ Novo" : "Entrar / Cadastrar"}
         </button>
 
-        {isAuthenticated && (
-          <div className="navbar-user" onClick={handleLogout} title="Clique para sair">
-            {user?.avatarUrl ? (
-              <img src={user.avatarUrl} alt={user.name} />
-            ) : (
-              <span className="avatar-fallback">{user?.name?.[0]?.toUpperCase()}</span>
-            )}
-            <span>{user?.name?.split(" ")[0]}</span>
-          </div>
-        )}
+        {isAuthenticated && <ProfileMenu />}
       </div>
     </header>
   );

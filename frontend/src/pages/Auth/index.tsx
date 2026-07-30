@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContext";
 
 type Mode = "login" | "register";
@@ -28,12 +29,24 @@ export default function Auth() {
     try {
       if (mode === "login") {
         await login({ email, password });
+        toast.success("Bem-vindo de volta!");
       } else {
         await register({ name, email, password });
+        toast.success("Conta criada com sucesso!");
       }
       navigate("/");
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Não foi possível concluir. Tente novamente.");
+      const apiMessage = err?.response?.data?.message;
+      if (mode === "login") {
+        // Mensagem fixa pedida para o fluxo de login, independente do
+        // texto exato retornado pela API (que pode variar por segurança).
+        setError(apiMessage || "E-mail ou senha incorretos.");
+        toast.error("E-mail ou senha incorretos");
+      } else {
+        const message = apiMessage || "Não foi possível criar sua conta. Tente novamente.";
+        setError(message);
+        toast.error(message);
+      }
     } finally {
       setSubmitting(false);
     }

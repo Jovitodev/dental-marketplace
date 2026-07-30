@@ -1,7 +1,10 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { officeService } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
+import { formatCRO, isValidCRO } from "../../utils/masks";
+import CurrencyInput from "../../components/CurrencyInput";
 import {
   Address,
   CreateOfficeDTO,
@@ -27,10 +30,19 @@ const EMPTY_ADDRESS: Address = {
   zipCode: "",
 };
 
+const REQUIRED_ADDRESS_FIELDS: (keyof Address)[] = [
+  "street",
+  "number",
+  "neighborhood",
+  "city",
+  "state",
+  "zipCode",
+];
+
 interface DraftService {
   id: string; // id local (client-side) para controlar a lista antes de salvar
   name: string;
-  price: string;
+  price: number;
 }
 
 function makeDraftId() {
@@ -46,18 +58,23 @@ export default function OfficeForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [croResponsible, setCroResponsible] = useState("");
+  const [croTouched, setCroTouched] = useState(false);
   const [address, setAddress] = useState<Address>(EMPTY_ADDRESS);
-  const [shiftPrices, setShiftPrices] = useState<Record<Shift, string>>({
-    MANHA: "",
-    TARDE: "",
-    NOITE: "",
+  const [shiftPrices, setShiftPrices] = useState<Record<Shift, number>>({
+    MANHA: 0,
+    TARDE: 0,
+    NOITE: 0,
   });
+  // Força a remontagem dos CurrencyInput de turno quando os dados de edição
+  // chegam (o valor inicial deles só é lido uma vez, no mount).
+  const [shiftInputsKey, setShiftInputsKey] = useState("new");
   const [equipments, setEquipments] = useState<string[]>([]);
   const [customEquipment, setCustomEquipment] = useState("");
   const [availableWeekdays, setAvailableWeekdays] = useState<Weekday[]>([]);
   const [services, setServices] = useState<DraftService[]>([]);
   const [newServiceName, setNewServiceName] = useState("");
-  const [newServicePrice, setNewServicePrice] = useState("");
+  const [newServicePrice, setNewServicePrice] = useState(0);
+  const [newServiceInputKey, setNewServiceInputKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,21 +88,24 @@ export default function OfficeForm() {
         const office = await officeService.getById(id as string);
         setTitle(office.title);
         setDescription(office.description);
-        setCroResponsible(office.croResponsible);
+        // Normaliza o CRO para o novo formato "12345-SP" mesmo se o dado
+        // salvo estiver no formato antigo (ex: "CRO-CE 10234"), evitando
+        // que o botão de salvar fique travado por causa de dados legados.
+        setCroResponsible(formatCRO(office.croResponsible));
         setAddress(office.address);
         setEquipments(office.equipments);
         setAvailableWeekdays(office.availableWeekdays ?? []);
-        setServices(
-          (office.services ?? []).map((s) => ({ id: s.id, name: s.name, price: String(s.price) }))
-        );
+        setServices((office.services ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price })));
 
-        const prices: Record<Shift, string> = { MANHA: "", TARDE: "", NOITE: "" };
+        const prices: Record<Shift, number> = { MANHA: 0, TARDE: 0, NOITE: 0 };
         office.shiftPrices.forEach((sp) => {
-          prices[sp.shift] = String(sp.price);
+          prices[sp.shift] = sp.price;
         });
         setShiftPrices(prices);
+        setShiftInputsKey(office.id); // remonta os CurrencyInput com os valores carregados
       } catch {
         setError("Não foi possível carregar os dados do consultório.");
+        toast.error("Não foi possível carregar os dados do consultório.");
       } finally {
         setLoading(false);
       }
@@ -117,19 +137,18 @@ export default function OfficeForm() {
 
   function addService() {
     const name = newServiceName.trim();
-    const price = Number(newServicePrice);
     if (!name) {
-      setError("Informe o nome do procedimento.");
+      toast.error("Informe o nome do procedimento.");
       return;
     }
-    if (!newServicePrice || isNaN(price) || price <= 0) {
-      setError("Informe um preço válido para o procedimento.");
+    if (!newServicePrice || newServicePrice <= 0) {
+      toast.error("Informe um preço válido para o procedimento.");
       return;
     }
-    setError(null);
     setServices((prev) => [...prev, { id: makeDraftId(), name, price: newServicePrice }]);
     setNewServiceName("");
-    setNewServicePrice("");
+    setNewServicePrice(0);
+    setNewServiceInputKey((k) => k + 1); // reseta o CurrencyInput do novo procedimento
   }
 
   function removeService(draftId: string) {
@@ -137,33 +156,49 @@ export default function OfficeForm() {
   }
 
   function buildShiftPricesPayload(): ShiftPrice[] {
-    return ALL_SHIFTS.filter((shift) => shiftPrices[shift].trim() !== "").map((shift) => ({
+    return ALL_SHIFTS.filter((shift) => shiftPrices[shift] > 0).map((shift) => ({
       shift,
-      price: Number(shiftPrices[shift]),
+      price: shiftPrices[shift],
     }));
   }
 
   function buildServicesPayload(): OfficeService[] {
-    return services.map((s) => ({ id: s.id, name: s.name, price: Number(s.price) }));
+    return services.map((s) => ({ id: s.id, name: s.name, price: s.price }));
   }
+
+  // ---------- Validação para habilitar/desabilitar o botão de salvar ----------
+  const isCroValid = isValidCRO(croResponsible);
+  const isAddressValid = REQUIRED_ADDRESS_FIELDS.every((field) => (address[field] || "").trim() !== "");
+  const hasAtLeastOneShiftPrice = ALL_SHIFTS.some((shift) => shiftPrices[shift] > 0);
+  const hasWeekday = availableWeekdays.length > 0;
+
+  const isFormValid = useMemo(
+    () =>
+      title.trim() !== "" &&
+      description.trim() !== "" &&
+      isCroValid &&
+      isAddressValid &&
+      hasAtLeastOneShiftPrice &&
+      hasWeekday,
+    [title, description, isCroValid, isAddressValid, hasAtLeastOneShiftPrice, hasWeekday]
+  );
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
 
-    const priceList = buildShiftPricesPayload();
-    if (priceList.length === 0) {
-      setError("Informe o preço de ao menos um turno.");
-      return;
-    }
-
-    if (availableWeekdays.length === 0) {
-      setError("Selecione ao menos um dia da semana disponível.");
+    if (!isFormValid) {
+      // Guarda extra: o botão já vem desabilitado, mas cobrimos o caso de
+      // submit via Enter no teclado.
+      if (!hasAtLeastOneShiftPrice) toast.error("Informe o preço de ao menos um turno.");
+      else if (!hasWeekday) toast.error("Selecione ao menos um dia da semana disponível.");
+      else if (!isCroValid) toast.error("Informe um CRO válido no formato 12345-SP.");
+      else toast.error("Preencha todos os campos obrigatórios antes de salvar.");
       return;
     }
 
     if (!user) {
-      setError("Você precisa estar logado para cadastrar um consultório.");
+      toast.error("Você precisa estar logado para cadastrar um consultório.");
       return;
     }
 
@@ -173,7 +208,7 @@ export default function OfficeForm() {
       description,
       croResponsible,
       address,
-      shiftPrices: priceList,
+      shiftPrices: buildShiftPricesPayload(),
       equipments,
       availableWeekdays,
       services: buildServicesPayload(),
@@ -183,12 +218,16 @@ export default function OfficeForm() {
       setSubmitting(true);
       if (isEditing) {
         await officeService.update(id as string, payload);
+        toast.success("Consultório atualizado com sucesso!");
       } else {
         await officeService.create(payload);
+        toast.success("Consultório cadastrado com sucesso!");
       }
       navigate("/dashboard");
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Erro ao salvar o consultório.");
+      const message = err?.response?.data?.message || "Erro ao salvar o consultório.";
+      setError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -232,14 +271,21 @@ export default function OfficeForm() {
             />
           </div>
 
-          <div className="field">
+          <div className={`field ${croTouched && !isCroValid ? "field-invalid" : ""}`}>
             <label>Registro CRO do responsável *</label>
             <input
               value={croResponsible}
-              onChange={(e) => setCroResponsible(e.target.value)}
-              placeholder="Ex: CRO-SP 12345"
+              onChange={(e) => setCroResponsible(formatCRO(e.target.value))}
+              onBlur={() => setCroTouched(true)}
+              placeholder="Ex: 12345-SP"
+              maxLength={9}
               required
             />
+            {croTouched && !isCroValid ? (
+              <p className="field-error-text">Use o formato número-UF, ex: 12345-SP.</p>
+            ) : (
+              <p className="helper-text">Formato: número do registro + sigla do estado (ex: 12345-SP).</p>
+            )}
           </div>
         </div>
 
@@ -336,21 +382,19 @@ export default function OfficeForm() {
         </div>
 
         <div className="form-section">
-          <h2>Preço por Turno</h2>
-          <p className="helper-text">Deixe em branco os turnos indisponíveis. Usado quando o dentista não escolhe um procedimento específico.</p>
+          <h2>Preço por Turno *</h2>
+          <p className="helper-text">
+            Deixe em R$ 0,00 os turnos indisponíveis. É obrigatório preencher ao menos um.
+            Usado quando o dentista não escolhe um procedimento específico.
+          </p>
 
           {ALL_SHIFTS.map((shift) => (
             <div className="shift-row" key={shift}>
               <label>{SHIFT_LABELS[shift]}</label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder="R$ 0,00"
+              <CurrencyInput
+                key={`${shiftInputsKey}-${shift}`}
                 value={shiftPrices[shift]}
-                onChange={(e) =>
-                  setShiftPrices((prev) => ({ ...prev, [shift]: e.target.value }))
-                }
+                onChange={(value) => setShiftPrices((prev) => ({ ...prev, [shift]: value }))}
               />
             </div>
           ))}
@@ -367,7 +411,9 @@ export default function OfficeForm() {
               {services.map((s) => (
                 <div className="service-list-item" key={s.id}>
                   <span>{s.name}</span>
-                  <strong>R$ {Number(s.price).toFixed(2)}</strong>
+                  <strong>
+                    {s.price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </strong>
                   <button type="button" onClick={() => removeService(s.id)} aria-label="Remover procedimento">
                     ✕
                   </button>
@@ -387,13 +433,10 @@ export default function OfficeForm() {
             </div>
             <div className="field">
               <label>Preço (R$/turno)</label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
+              <CurrencyInput
+                key={newServiceInputKey}
                 value={newServicePrice}
-                onChange={(e) => setNewServicePrice(e.target.value)}
-                placeholder="Ex: 200"
+                onChange={setNewServicePrice}
               />
             </div>
           </div>
@@ -449,7 +492,12 @@ export default function OfficeForm() {
           <button type="button" className="btn-secondary" onClick={() => navigate("/dashboard")}>
             Cancelar
           </button>
-          <button type="submit" className="btn-primary" disabled={submitting}>
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={submitting || !isFormValid}
+            title={!isFormValid ? "Preencha Título, CRO, Endereço e ao menos um Preço de Turno" : undefined}
+          >
             {submitting ? "Salvando..." : "Salvar Consultório"}
           </button>
         </div>

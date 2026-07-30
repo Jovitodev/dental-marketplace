@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { bookingService } from "../../../services/booking";
 import { BookingProposal } from "../../../types/booking";
 import ProposalCard from "../../../components/ProposalCard";
@@ -38,8 +39,9 @@ export default function ReceivedProposals() {
       setActingId(id);
       const updated = await bookingService.accept(id);
       updateLocal(updated);
+      toast.success("Proposta aceita! A cobrança foi gerada.");
     } catch (err: any) {
-      alert(err?.response?.data?.message || "Erro ao aceitar a proposta.");
+      toast.error(err?.response?.data?.message || "Erro ao aceitar a proposta.");
     } finally {
       setActingId(null);
     }
@@ -53,8 +55,9 @@ export default function ReceivedProposals() {
       setActingId(id);
       const updated = await bookingService.reject(id);
       updateLocal(updated);
+      toast.success("Proposta recusada.");
     } catch (err: any) {
-      alert(err?.response?.data?.message || "Erro ao recusar a proposta.");
+      toast.error(err?.response?.data?.message || "Erro ao recusar a proposta.");
     } finally {
       setActingId(null);
     }

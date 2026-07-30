@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Office, SHIFT_LABELS } from "../../types/office";
+import { favoritesService } from "../../services/favorites";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=800&auto=format&fit=crop";
@@ -44,7 +45,7 @@ export default function OfficeCard({
   onToggleStatus,
   onDelete,
 }: OfficeCardProps) {
-  const [favorited, setFavorited] = useState(false);
+  const [favorited, setFavorited] = useState(() => favoritesService.isFavorited(office.id));
   const price = lowestPrice(office);
   const bestShift = office.shiftPrices.find((s) => s.price === price)?.shift;
 
@@ -72,7 +73,7 @@ export default function OfficeCard({
           aria-label="Favoritar"
           onClick={(e) => {
             e.stopPropagation();
-            setFavorited((f) => !f);
+            setFavorited(favoritesService.toggle(office.id));
           }}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

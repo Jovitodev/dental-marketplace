@@ -4,6 +4,7 @@ import { officeRoutes } from "./modules/offices/office.routes";
 import { userRoutes } from "./modules/users/user.routes";
 import { adminRoutes } from "./modules/admin/admin.routes";
 import { bookingRoutes } from "./modules/bookings/booking.routes";
+import { conversationRoutes } from "./modules/conversations/conversation.routes";
 
 const app = express();
 const PORT = process.env.PORT || 3333;
@@ -22,6 +23,7 @@ app.use("/api", officeRoutes);
 app.use("/api", userRoutes);
 app.use("/api", adminRoutes);
 app.use("/api", bookingRoutes);
+app.use("/api", conversationRoutes);
 
 // 404 padrão
 app.use((_req: Request, res: Response) => {

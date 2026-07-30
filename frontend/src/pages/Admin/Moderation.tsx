@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { adminService } from "../../services/admin";
 import { Office } from "../../types/office";
 
@@ -30,8 +31,9 @@ export default function Moderation() {
       setActingId(id);
       await adminService.approveOffice(id);
       setOffices((prev) => prev.filter((o) => o.id !== id));
-    } catch {
-      alert("Erro ao aprovar o consultório.");
+      toast.success("Consultório aprovado!");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Erro ao aprovar o consultório.");
     } finally {
       setActingId(null);
     }
@@ -45,8 +47,9 @@ export default function Moderation() {
       setActingId(id);
       await adminService.rejectOffice(id);
       setOffices((prev) => prev.filter((o) => o.id !== id));
-    } catch {
-      alert("Erro ao recusar o consultório.");
+      toast.success("Anúncio recusado.");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Erro ao recusar o consultório.");
     } finally {
       setActingId(null);
     }

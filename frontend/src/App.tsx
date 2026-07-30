@@ -9,6 +9,11 @@ import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import ReceivedProposals from "./pages/Proposals/Received";
 import SentProposals from "./pages/Proposals/Sent";
+import Favorites from "./pages/Favorites";
+import Messages from "./pages/Messages";
+import Profile from "./pages/Profile";
+import Help from "./pages/Help";
+import HostPanel from "./pages/HostPanel";
 
 // Layout raiz + definição de rotas.
 // Para novos módulos (ex: /chat, /reviews), adicione novas <Route> aqui
@@ -21,6 +26,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/auth" element={<Auth />} />
+        <Route path="/help" element={<Help />} />
         <Route
           path="/dashboard"
           element={
@@ -59,6 +65,38 @@ export default function App() {
           element={
             <ProtectedRoute>
               <SentProposals />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/favorites"
+          element={
+            <ProtectedRoute>
+              <Favorites />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages"
+          element={
+            <ProtectedRoute>
+              <Messages />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/host"
+          element={
+            <ProtectedRoute>
+              <HostPanel />
             </ProtectedRoute>
           }
         />

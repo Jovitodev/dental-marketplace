@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { officeService } from "../../services/api";
 import { authService } from "../../services/auth";
 import { bookingService } from "../../services/booking";
+import { conversationService } from "../../services/conversation";
+import { favoritesService } from "../../services/favorites";
 import { useAuth } from "../../context/AuthContext";
 import { Office, SHIFT_LABELS, Shift, WEEKDAY_LABELS } from "../../types/office";
 import { PublicHostProfile } from "../../types/user";
 import EquipmentIcon, { EQUIPMENT_DISPLAY_LABELS } from "../../components/EquipmentIcon";
+import CurrencyInput from "../../components/CurrencyInput";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=1200&auto=format&fit=crop";
@@ -30,10 +34,16 @@ export default function OfficeDetails() {
   const [selectedShift, setSelectedShift] = useState<Shift | "">("");
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
-  const [offeredPrice, setOfferedPrice] = useState("");
+  const [offeredPrice, setOfferedPrice] = useState(0);
+  const [offeredPriceInputKey, setOfferedPriceInputKey] = useState(0);
   const [submittingProposal, setSubmittingProposal] = useState(false);
   const [proposalError, setProposalError] = useState<string | null>(null);
   const [proposalSuccess, setProposalSuccess] = useState(false);
+
+  const [contactMessage, setContactMessage] = useState("");
+  const [sendingContact, setSendingContact] = useState(false);
+  const [contactError, setContactError] = useState<string | null>(null);
+  const [contactSuccess, setContactSuccess] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -44,6 +54,7 @@ export default function OfficeDetails() {
         setError(null);
         const officeData = await officeService.getById(id as string);
         setOffice(officeData);
+        setSaved(favoritesService.isFavorited(officeData.id));
 
         if (officeData.shiftPrices[0]) {
           setSelectedShift(officeData.shiftPrices[0].shift);
@@ -87,7 +98,8 @@ export default function OfficeDetails() {
   // após a última troca (comportamento simples: reseta ao trocar seleção).
   useEffect(() => {
     if (listedPrice != null) {
-      setOfferedPrice(String(listedPrice));
+      setOfferedPrice(listedPrice);
+      setOfferedPriceInputKey((k) => k + 1); // remonta o CurrencyInput com o novo valor tabelado
     }
   }, [selectedServiceId, selectedShift]);
 
@@ -103,16 +115,21 @@ export default function OfficeDetails() {
     if (!office) return;
 
     if (!selectedDate) {
-      setProposalError("Selecione uma data.");
+      const message = "Selecione uma data.";
+      setProposalError(message);
+      toast.error(message);
       return;
     }
     if (!selectedShift) {
-      setProposalError("Selecione um turno.");
+      const message = "Selecione um turno.";
+      setProposalError(message);
+      toast.error(message);
       return;
     }
-    const priceNumber = Number(offeredPrice);
-    if (!offeredPrice || isNaN(priceNumber) || priceNumber <= 0) {
-      setProposalError("Informe um valor de oferta válido.");
+    if (!offeredPrice || offeredPrice <= 0) {
+      const message = "Informe um valor de oferta válido.";
+      setProposalError(message);
+      toast.error(message);
       return;
     }
 
@@ -123,13 +140,49 @@ export default function OfficeDetails() {
         date: selectedDate,
         shift: selectedShift,
         serviceId: selectedServiceId || undefined,
-        offeredPrice: priceNumber,
+        offeredPrice,
       });
       setProposalSuccess(true);
+      toast.success("Proposta enviada com sucesso!");
     } catch (err: any) {
-      setProposalError(err?.response?.data?.message || "Erro ao enviar a proposta.");
+      const message = err?.response?.data?.message || "Erro ao enviar a proposta.";
+      setProposalError(message);
+      toast.error(message);
     } finally {
       setSubmittingProposal(false);
+    }
+  }
+
+  async function handleSendContactMessage() {
+    setContactError(null);
+    setContactSuccess(false);
+
+    if (!isAuthenticated) {
+      navigate("/auth");
+      return;
+    }
+
+    if (!office) return;
+
+    if (!contactMessage.trim()) {
+      const message = "Escreva uma mensagem antes de enviar.";
+      setContactError(message);
+      toast.error(message);
+      return;
+    }
+
+    try {
+      setSendingContact(true);
+      await conversationService.start({ officeId: office.id, text: contactMessage.trim() });
+      setContactSuccess(true);
+      setContactMessage("");
+      toast.success("Mensagem enviada com sucesso!");
+    } catch (err: any) {
+      const message = err?.response?.data?.message || "Erro ao enviar a mensagem.";
+      setContactError(message);
+      toast.error(message);
+    } finally {
+      setSendingContact(false);
     }
   }
 
@@ -161,7 +214,7 @@ export default function OfficeDetails() {
           <span className="details-rating">
             ⭐ {overallRating.toFixed(2).replace(".", ",")} · {reviews.length} avaliações
           </span>
-          <button className={`save-btn ${saved ? "saved" : ""}`} onClick={() => setSaved((s) => !s)}>
+          <button className={`save-btn ${saved ? "saved" : ""}`} onClick={() => setSaved(favoritesService.toggle(office.id))}>
             <svg width="16" height="16" viewBox="0 0 24 24">
               <path
                 d="M12 21s-6.7-4.35-9.3-8.02C1.1 10.7 1.4 7.6 3.7 5.9c2.1-1.55 4.9-1.1 6.4.8L12 8.7l1.9-2c1.5-1.9 4.3-2.35 6.4-.8 2.3 1.7 2.6 4.8.99 7.08C18.7 16.65 12 21 12 21z"
@@ -267,9 +320,45 @@ export default function OfficeDetails() {
                   <li>{host.responseTime}</li>
                   <li>{host.yearsHosting} anos hospedando</li>
                 </ul>
-                <button className="btn-secondary" onClick={() => alert("Módulo de chat ainda não implementado.")}>
-                  Enviar mensagem ao anfitrião
-                </button>
+              </div>
+            </>
+          )}
+
+          {host && (
+            <>
+              <hr />
+              <div className="contact-host-section">
+                <h3>Ainda tem dúvidas? Enviar mensagem ao anfitrião</h3>
+
+                {contactSuccess ? (
+                  <div className="contact-success">
+                    <span>✅ Mensagem enviada para {host.name}!</span>
+                    <p className="helper-text">
+                      Você pode acompanhar a conversa em{" "}
+                      <span className="link-text" onClick={() => navigate("/messages")}>
+                        Mensagens
+                      </span>
+                      .
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <textarea
+                      className="contact-host-textarea"
+                      value={contactMessage}
+                      onChange={(e) => setContactMessage(e.target.value)}
+                      placeholder={`Olá, ${host.name}! Estarei visitando...`}
+                    />
+                    {contactError && <p className="error-text">{contactError}</p>}
+                    <button
+                      className="btn-primary"
+                      onClick={handleSendContactMessage}
+                      disabled={sendingContact}
+                    >
+                      {sendingContact ? "Enviando..." : "Enviar mensagem"}
+                    </button>
+                  </>
+                )}
               </div>
             </>
           )}
@@ -291,7 +380,12 @@ export default function OfficeDetails() {
           ) : (
             <>
               <div className="booking-price">
-                <strong>R$ {listedPrice?.toFixed(2) ?? "--"}</strong> / turno
+                <strong>
+                  {listedPrice != null
+                    ? listedPrice.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+                    : "--"}
+                </strong>{" "}
+                / turno
                 <p className="helper-text" style={{ margin: "2px 0 0" }}>Valor tabelado — você pode propor outro abaixo</p>
               </div>
 
@@ -333,12 +427,10 @@ export default function OfficeDetails() {
 
               <div className="field">
                 <label>Sua oferta de valor (R$)</label>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
+                <CurrencyInput
+                  key={offeredPriceInputKey}
                   value={offeredPrice}
-                  onChange={(e) => setOfferedPrice(e.target.value)}
+                  onChange={setOfferedPrice}
                 />
                 <p className="helper-text">
                   Pré-preenchido com o valor tabelado. Você pode ajustar para propor um valor diferente.
